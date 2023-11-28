@@ -48,6 +48,12 @@ class OffenseAgent(ReflexCaptureAgent):
         foodList = self.getFood(successor).asList()
         myPos = successor.getAgentState(self.index).getPosition()
 
+        # This should always be True, but better safe than sorry.
+        if (len(foodList) > 0):
+            minDistance = min([self.getMazeDistance(myPos, food) for food in foodList])
+            features['distanceToFood'] = minDistance
+
+
         # Get opponent positions
         isRedGhost = self.red and successor.isOnRedSide(myPos)
         isBlueGhost = (not self.red) and successor.isOnBlueSide(myPos)
@@ -66,18 +72,17 @@ class OffenseAgent(ReflexCaptureAgent):
                 if minOpponentDistance < 3:
                     features['distanceToOpponent'] = -10000
 
-        # This should always be True, but better safe than sorry.
-        if (len(foodList) > 0):
-            minDistance = min([self.getMazeDistance(myPos, food) for food in foodList])
-            features['distanceToFood'] = minDistance
-
+        # Get remaining food
+        features['numFood'] = successor.getNumFood()            
+        
         return features
 
     def getWeights(self, gameState, action):
         return {
             'successorScore': 100,
             'distanceToFood': -5,
-            'distanceToOpponent': 1
+            'distanceToOpponent': 1,
+            'numFood': -5
         }
 
 class DefenseAgent(ReflexCaptureAgent):
