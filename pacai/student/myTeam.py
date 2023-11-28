@@ -73,7 +73,10 @@ class OffenseAgent(ReflexCaptureAgent):
                     features['distanceToOpponent'] = -10000
 
         # Get remaining food
-        features['numFood'] = successor.getNumFood()            
+        if (successor.isOnBlueTeam):
+            features['numFood'] = len(successor.getRedFood().asList())
+        else:
+            features['numFood'] = len(successor.getBlueFood().asList())  
         
         return features
 
