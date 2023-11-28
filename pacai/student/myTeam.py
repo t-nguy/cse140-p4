@@ -76,7 +76,13 @@ class OffenseAgent(ReflexCaptureAgent):
         if (successor.isOnBlueTeam):
             features['numFood'] = len(successor.getRedFood().asList())
         else:
-            features['numFood'] = len(successor.getBlueFood().asList())  
+            features['numFood'] = len(successor.getBlueFood().asList())
+
+        # Get remaining capsules
+        if (successor.isOnBlueTeam):
+            features["numCapsules"] = len(successor.getRedCapsules())
+        else:
+            features["numCapsules"] = len(successor.getBlueCapsules())
         
         return features
 
@@ -85,7 +91,8 @@ class OffenseAgent(ReflexCaptureAgent):
             'successorScore': 100,
             'distanceToFood': -5,
             'distanceToOpponent': 1,
-            'numFood': -5
+            'numFood': -5,
+            'numCapsules': -1
         }
 
 class DefenseAgent(ReflexCaptureAgent):
