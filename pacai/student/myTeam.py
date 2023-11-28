@@ -63,6 +63,10 @@ class OffenseAgent(ReflexCaptureAgent):
             minOpponentDistance = None
 
             for opponentIndex in opponentIndices:
+                if (successor.getAgentState(opponentIndex).isScared()):
+                    features['distanceToOpponent'] = 0
+                    break
+
                 opponentPos = successor.getAgentState(opponentIndex).getPosition()
                 d = self.getMazeDistance(myPos, opponentPos)
 
