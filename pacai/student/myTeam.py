@@ -1,5 +1,9 @@
+from pacai.agents.capture.capture import CaptureAgent
 from pacai.agents.capture.reflex import ReflexCaptureAgent
 from pacai.core.directions import Directions
+import math
+from pacai.util import probability
+from pacai.core.actions import Actions
 
 def createTeam(firstIndex, secondIndex, isRed,
         first = 'pacai.agents.capture.dummy.DummyAgent',
@@ -18,11 +22,7 @@ def createTeam(firstIndex, secondIndex, isRed,
         secondAgent(secondIndex),
     ]
 
-class OffenseAgent(ReflexCaptureAgent):
-    """
-    A Dummy agent to serve as an example of the necessary agent structure.
-    You should look at `pacai.core.baselineTeam` for more details about how to create an agent.
-    """
+class OffenseAgent(CaptureAgent):
 
     def __init__(self, index, **kwargs):
         super().__init__(index, **kwargs)
@@ -38,67 +38,113 @@ class OffenseAgent(ReflexCaptureAgent):
         super().registerInitialState(gameState)
 
         # Your initialization code goes here, if you need any.
+        self.featExtractor = FeatureExtractor()
+        self.weights = {}
+        self.epsilon = 0.05
+        self.alpha = 0.2
+        self.gamma = 0.8
+        self.discount = 0.9
 
-    def getFeatures(self, gameState, action):
+    def getQValue(self, state, action):
+        features = self.featExtractor.getFeatures(state, action, self)
+        qVal = 0.0
+        for feature, count in features.items():
+            if feature not in self.weights:
+                continue
+            qVal += self.weights[feature] * count
+        return qVal
+    
+    def getValue(self, state):
+        legalActs = self.getLegalActions(state)
+        if not legalActs:
+            return 0.0
+        max = -math.inf
+        for act in legalActs:
+            val = self.getQValue(state, act)
+            if val > max:
+                max = val
+        return max
+    
+    def getPolicy(self, state):
+        legalActs = self.getLegalActions(state)
+        if not legalActs:
+            return None
+        max = -math.inf
+        maxAct = None
+        for act in legalActs:
+            val = self.getQValue(state, act)
+            if val > max:
+                max = val
+                maxAct = act
+        return maxAct
+    
+    def chooseAction(self, state):
+        isDoRandomAct = probability.flipCoin(self.epsilon)
+        legalActs = self.getLegalActions(state)
+        if not legalActs:
+            return None
+        if isDoRandomAct:
+            return probability.random.choice(legalActs)
+        else:
+            return self.getPolicy(state)
+    
+    def update(self, state, action, nextState, reward):
+        features = self.featExtractor.getFeatures(self.featExtractor, state, action)
+        sample = reward + self.discountRate * self.getValue(nextState)
+        error = sample - self.getQValue(state, action)
+        for feature, count in features.items():
+            if feature not in self.weights:
+                self.weights[feature] = self.alpha * error * count
+            else:
+                self.weights[feature] += self.alpha * error * count
+    
+    def final(self, state):
+        print(self.weights)
+
+    def getLegalActions(self, state):
+        return state.getLegalActions(self.index)
+
+class FeatureExtractor:
+    def getFeatures(self, state, action, agent):
+        # Extract the grid of food and wall locations and get the ghost locations.
+        food = agent.getFood(state)
+        walls = state.getWalls()
+        ghosts = [state.getAgentState(op).getPosition() for op in agent.getOpponents(state)]
+
         features = {}
-        successor = self.getSuccessor(gameState, action)
-        features['successorScore'] = self.getScore(successor)
+        features["bias"] = 1.0
 
-        # Compute distance to the nearest food.
-        foodList = self.getFood(successor).asList()
-        myPos = successor.getAgentState(self.index).getPosition()
+        # Compute the location of pacman after he takes the action.
+        x, y = state.getAgentPosition(agent.index)
+        dx, dy = Actions.directionToVector(action)
+        next_x, next_y = int(x + dx), int(y + dy)
+
+        # Count the number of ghosts 1-step away.
+        features["#-of-ghosts-1-step-away"] = sum((next_x, next_y) in
+                Actions.getLegalNeighbors(g, walls) for g in ghosts)
+
+        # If there is no danger of ghosts then add the food feature.
+        if not features["#-of-ghosts-1-step-away"] and food[next_x][next_y]:
+            features["eats-food"] = 1.0
+
+         # Compute distance to the nearest food.
+        dist = math.inf
+        foodList = food.asList()
+        myPos = state.getAgentPosition(agent.index)
 
         # This should always be True, but better safe than sorry.
         if (len(foodList) > 0):
-            minDistance = min([self.getMazeDistance(myPos, food) for food in foodList])
-            features['distanceToFood'] = minDistance
+            dist = min([agent.getMazeDistance(myPos, food) for food in foodList])
 
+        if dist is not None:
+            # Make the distance a number less than one otherwise the update will diverge wildly.
+            features["closest-food"] = float(dist) / (walls.getWidth() * walls.getHeight())
 
-        # Get opponent positions
-        isRedGhost = self.red and successor.isOnRedSide(myPos)
-        isBlueGhost = (not self.red) and successor.isOnBlueSide(myPos)
-        minOpponentDistance = None
-
-        if not isRedGhost and not isBlueGhost:
-            opponentIndices = self.getOpponents(successor)
-
-            features['distanceToOpponent'] = 0
-
-            for opponentIndex in opponentIndices:
-                if (successor.getAgentState(opponentIndex).isScared()):
-                    continue
-
-                opponentPos = successor.getAgentState(opponentIndex).getPosition()
-                d = self.getMazeDistance(myPos, opponentPos)
-
-                if minOpponentDistance is None or d < minOpponentDistance:
-                    minOpponentDistance = d
-
-                if minOpponentDistance < 3:
-                    features['distanceToOpponent'] = -10000
-
-        # Get remaining food
-        if (successor.isOnBlueTeam):
-            features['numFood'] = len(successor.getRedFood().asList())
-        else:
-            features['numFood'] = len(successor.getBlueFood().asList())
-
-        # Get remaining capsules
-        if (successor.isOnBlueTeam):
-            features["numCapsules"] = len(successor.getRedCapsules())
-        else:
-            features["numCapsules"] = len(successor.getBlueCapsules())
+        for key in features:
+            features[key] /= 10.0
 
         return features
 
-    def getWeights(self, gameState, action):
-        return {
-            'successorScore': 100,
-            'distanceToFood': -5,
-            'distanceToOpponent': 1,
-            'numFood': -5,
-            'numCapsules': -4
-        }
 
 class DefenseAgent(ReflexCaptureAgent):
 
