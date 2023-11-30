@@ -57,15 +57,16 @@ class OffenseAgent(ReflexCaptureAgent):
         # Get opponent positions
         isRedGhost = self.red and successor.isOnRedSide(myPos)
         isBlueGhost = (not self.red) and successor.isOnBlueSide(myPos)
+        minOpponentDistance = None
 
         if not isRedGhost and not isBlueGhost:
             opponentIndices = self.getOpponents(successor)
-            minOpponentDistance = None
+
+            features['distanceToOpponent'] = 0
 
             for opponentIndex in opponentIndices:
                 if (successor.getAgentState(opponentIndex).isScared()):
-                    features['distanceToOpponent'] = 0
-                    break
+                    continue
 
                 opponentPos = successor.getAgentState(opponentIndex).getPosition()
                 d = self.getMazeDistance(myPos, opponentPos)
@@ -87,7 +88,7 @@ class OffenseAgent(ReflexCaptureAgent):
             features["numCapsules"] = len(successor.getRedCapsules())
         else:
             features["numCapsules"] = len(successor.getBlueCapsules())
-        
+
         return features
 
     def getWeights(self, gameState, action):
@@ -96,7 +97,7 @@ class OffenseAgent(ReflexCaptureAgent):
             'distanceToFood': -5,
             'distanceToOpponent': 1,
             'numFood': -5,
-            'numCapsules': -1
+            'numCapsules': -4
         }
 
 class DefenseAgent(ReflexCaptureAgent):
@@ -132,6 +133,11 @@ class DefenseAgent(ReflexCaptureAgent):
         if (action == rev):
             features['reverse'] = 1
 
+        # Keep to the middle when no invaders
+        if len(invaders) == 0:
+            middleDistance = [self.getMazeDistance(myPos, (12, 8))]
+            features['middle'] = min(middleDistance)
+
         return features
 
     def getWeights(self, gameState, action):
@@ -140,5 +146,6 @@ class DefenseAgent(ReflexCaptureAgent):
             'onDefense': 100,
             'invaderDistance': -10,
             'stop': -100,
-            'reverse': -2
+            'reverse': -2,
+            'middle': -10
         }
