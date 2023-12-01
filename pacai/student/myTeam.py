@@ -128,7 +128,7 @@ class FeatureExtractor:
             features["eats-food"] = 1.0
 
          # Compute distance to the nearest food.
-        dist = math.inf
+        dist = None
         foodList = food.asList()
         myPos = state.getAgentPosition(agent.index)
 
