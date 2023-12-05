@@ -53,7 +53,6 @@ class OffenseAgent(ReflexCaptureAgent):
             minDistance = min([self.getMazeDistance(myPos, food) for food in foodList])
             features['distanceToFood'] = minDistance
 
-
         # Get opponent positions
         isRedGhost = self.red and successor.isOnRedSide(myPos)
         isBlueGhost = (not self.red) and successor.isOnBlueSide(myPos)
@@ -94,10 +93,10 @@ class OffenseAgent(ReflexCaptureAgent):
     def getWeights(self, gameState, action):
         return {
             'successorScore': 100,
-            'distanceToFood': -5,
-            'distanceToOpponent': 1,
-            'numFood': -5,
-            'numCapsules': -4
+            'distanceToFood': -1,
+            'distanceToOpponent': 2,
+            'numFood': -1,
+            'numCapsules': -1
         }
 
 class DefenseAgent(ReflexCaptureAgent):
@@ -133,10 +132,19 @@ class DefenseAgent(ReflexCaptureAgent):
         if (action == rev):
             features['reverse'] = 1
 
-        # Keep to the middle when no invaders
+        # Go close to enemy when no invaders
         if len(invaders) == 0:
-            middleDistance = [self.getMazeDistance(myPos, (12, 8))]
-            features['middle'] = min(middleDistance)
+            minOpponentDistance = None
+            opponentIndices = self.getOpponents(successor)
+            features['distanceToOpponent'] = 0
+
+            for opponentIndex in opponentIndices:
+                opponentPos = successor.getAgentState(opponentIndex).getPosition()
+                d = self.getMazeDistance(myPos, opponentPos)
+
+                if minOpponentDistance is None or d < minOpponentDistance:
+                    minOpponentDistance = d
+            features['distanceToOpponent'] = 1 / minOpponentDistance
 
         return features
 
@@ -147,5 +155,5 @@ class DefenseAgent(ReflexCaptureAgent):
             'invaderDistance': -10,
             'stop': -100,
             'reverse': -2,
-            'middle': -10
+            'distanceToOpponent': 1
         }
